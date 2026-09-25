@@ -404,7 +404,7 @@
     const p = progress();
     target = p * (N - 1);
     // Ease toward the target frame so fast flicks glide instead of jumping.
-    pos = reduce ? target : pos + (target - pos) * 0.13;
+    pos = reduce ? target : pos + (target - pos) * 0.15;
     if (Math.abs(target - pos) < 0.01) pos = target;
     const f = Math.round(pos);
     draw(f);
@@ -444,7 +444,7 @@
     const top = scrollY + r.top + t * span;
     const done = () => { snapping = false; lastY = scrollY; };
     snapping = true;
-    if (lenis) lenis.scrollTo(top, { duration: 2.1, easing: t => 0.5 - Math.cos(Math.PI * t) / 2, lock: true, onComplete: done });
+    if (lenis) lenis.scrollTo(top, { duration: 1.8, easing: t => 0.5 - Math.cos(Math.PI * t) / 2, lock: true, onComplete: done });
     else { scrollTo({ top, behavior: 'smooth' }); setTimeout(done, 1200); }
   }
   if (!reduce) addEventListener('scroll', () => {
