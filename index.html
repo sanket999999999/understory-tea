@@ -58,7 +58,7 @@
   .bar nav a:hover { color: var(--paper); }
 
   /* ---------- scroll reel ---------- */
-  .reel { position: relative; height: 640vh; }
+  .reel { position: relative; height: 420vh; }
   .stage {
     position: sticky; top: 0;
     height: 100vh; height: 100svh;
@@ -176,7 +176,7 @@
 
   @media (max-width: 820px) {
     body { font-size: 16px; }
-    .reel { height: 520vh; }
+    .reel { height: 380vh; }
     .teas { grid-template-columns: 1fr; }
     .brew { grid-template-columns: 1fr; }
     .bar { padding-block: calc(14px + env(safe-area-inset-top, 0px)) 14px; background: linear-gradient(rgba(10,17,12,.7), rgba(10,17,12,0)); }
@@ -429,6 +429,32 @@
     if (lenis) lenis.scrollTo(el, { offset: 0 });
     else el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
   }));
+
+  // Chapter snapping: when scrolling stops inside the film, glide on to the next
+  // text panel in the direction of travel, so one flick or swipe plays a whole chapter.
+  const snaps = [0, 0.3, 0.54, 1];
+  let lastY = scrollY, heading = 1, idle = 0, snapping = false;
+  function snap() {
+    const r = reel.getBoundingClientRect();
+    const span = r.height - innerHeight;
+    const p = -r.top / span;
+    if (p <= 0.002 || p >= 0.998) return;
+    if (snaps.some(s => Math.abs(s - p) < 0.015)) return;
+    const t = heading > 0 ? snaps.find(s => s > p) : [...snaps].reverse().find(s => s < p);
+    const top = scrollY + r.top + t * span;
+    const done = () => { snapping = false; lastY = scrollY; };
+    snapping = true;
+    if (lenis) lenis.scrollTo(top, { duration: 1.5, lock: true, onComplete: done });
+    else { scrollTo({ top, behavior: 'smooth' }); setTimeout(done, 1000); }
+  }
+  if (!reduce) addEventListener('scroll', () => {
+    const y = scrollY;
+    if (y !== lastY) heading = y > lastY ? 1 : -1;
+    lastY = y;
+    if (snapping) return;
+    clearTimeout(idle);
+    idle = setTimeout(snap, 140);
+  }, { passive: true });
 
   addEventListener('resize', () => { loadSet(pickDir()); size(false); });
   size(true);
