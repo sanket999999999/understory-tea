@@ -370,9 +370,10 @@
     canvas.width = Math.round(canvas.clientWidth * dprNow());
     canvas.height = Math.round(canvas.clientHeight * dprNow());
     drawn = -1;
-    draw(Math.round(pos));
+    render(pos);
   }
-  const dprNow = () => Math.min(devicePixelRatio || 1, 2);
+  // Keep the canvas close to the frames' own resolution; drawing more pixels than the source has only costs smoothness.
+  const dprNow = () => Math.min(devicePixelRatio || 1, 1.5, 1600 / Math.max(1, canvas.clientWidth, canvas.clientHeight * 0.9));
 
   function nearestLoaded(i) {
     for (let d = 0; d < N; d++) {
@@ -383,15 +384,28 @@
     return null;
   }
 
-  function draw(i) {
-    if (i === drawn) return;
-    const img = nearestLoaded(i);
-    if (!img) return;
+  const ready = img => img && img.complete && img.naturalWidth;
+
+  function paint(img, alpha) {
     const cw = canvas.width, ch = canvas.height;
     const s = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
     const w = img.naturalWidth * s, h = img.naturalHeight * s;
+    ctx.globalAlpha = alpha;
     ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);
-    if (img === frames[i]) drawn = i;
+    ctx.globalAlpha = 1;
+  }
+
+  // Blend each frame into the next by the fractional position, so a 12 fps film
+  // moves continuously under a slow scroll instead of stepping frame to frame.
+  function render(x) {
+    if (drawn !== -1 && Math.abs(x - drawn) < 0.004) return;
+    const i = Math.floor(x), f = x - i;
+    const a = ready(frames[i]) ? frames[i] : nearestLoaded(i);
+    if (!a) return;
+    paint(a, 1);
+    const b = frames[i + 1];
+    if (f > 0.02 && a === frames[i] && ready(b)) paint(b, f);
+    drawn = a === frames[i] ? x : -1;
   }
 
   function progress() {
@@ -404,10 +418,10 @@
     const p = progress();
     target = p * (N - 1);
     // Ease toward the target frame so fast flicks glide instead of jumping.
-    pos = reduce ? target : pos + (target - pos) * 0.15;
+    pos = reduce ? target : pos + (target - pos) * 0.2;
     if (Math.abs(target - pos) < 0.01) pos = target;
+    render(pos);
     const f = Math.round(pos);
-    draw(f);
     fno.textContent = `${String(f + 1).padStart(3, '0')} / ${N}`;
     fill.style.transform = `scaleY(${p})`;
     cue.style.opacity = p > 0.02 ? 0 : 1;
@@ -419,7 +433,7 @@
 
   let lenis = null;
   if (window.Lenis && !reduce) {
-    lenis = new Lenis({ duration: 1.25, easing: t => Math.min(1, 1.001 - Math.pow(2, -10 * t)), smoothWheel: true });
+    lenis = new Lenis({ lerp: 0.08, wheelMultiplier: 0.9, smoothWheel: true });
     document.documentElement.classList.add('lenis');
   }
   document.querySelectorAll('a[href^="#"]').forEach(a => a.addEventListener('click', e => {
