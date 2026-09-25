@@ -345,11 +345,23 @@
   const cue = document.getElementById('cue');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const frames = new Array(N);
-  // Phones and small screens get the lighter 720px frames.
-  const dir = Math.max(screen.width, screen.height) * Math.min(devicePixelRatio || 1, 2) > 1600 && innerWidth > 820 ? 'frames' : 'frames-sm';
-  let drawn = -1, target = 0, pos = 0, lastW = 0;
+  // Portrait screens get the vertical cut of the film; small landscape screens get lighter frames.
+  const pickDir = () => innerHeight > innerWidth ? 'frames-m'
+    : Math.max(screen.width, screen.height) * Math.min(devicePixelRatio || 1, 2) > 1600 && innerWidth > 820 ? 'frames' : 'frames-sm';
+  let dir = '', drawn = -1, target = 0, pos = 0, lastW = 0;
 
-  const src = i => `${dir}/f_${String(i + 1).padStart(3, '0')}.webp`;
+  function loadSet(d) {
+    if (d === dir) return;
+    dir = d;
+    drawn = -1;
+    for (let i = 0; i < N; i++) {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => { if (dir === d) drawn = -1; };
+      img.src = `${d}/f_${String(i + 1).padStart(3, '0')}.webp`;
+      frames[i] = img;
+    }
+  }
 
   function size(force) {
     // Mobile browsers fire resize when the address bar slides; only redraw on real changes.
@@ -378,10 +390,7 @@
     const cw = canvas.width, ch = canvas.height;
     const s = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
     const w = img.naturalWidth * s, h = img.naturalHeight * s;
-    // On portrait screens keep the face in view: bias the crop slightly right of centre.
-    const fx = cw < ch ? 0.56 : 0.5;
-    const x = Math.min(0, Math.max(cw - w, cw / 2 - w * fx));
-    ctx.drawImage(img, x, (ch - h) / 2, w, h);
+    ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);
     if (img === frames[i]) drawn = i;
   }
 
@@ -406,13 +415,7 @@
     requestAnimationFrame(tick);
   }
 
-  for (let i = 0; i < N; i++) {
-    const img = new Image();
-    img.decoding = 'async';
-    img.onload = () => { drawn = -1; };
-    img.src = src(i);
-    frames[i] = img;
-  }
+  loadSet(pickDir());
 
   let lenis = null;
   if (window.Lenis && !reduce) {
@@ -427,7 +430,7 @@
     else el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
   }));
 
-  addEventListener('resize', () => size(false));
+  addEventListener('resize', () => { loadSet(pickDir()); size(false); });
   size(true);
   requestAnimationFrame(tick);
 
